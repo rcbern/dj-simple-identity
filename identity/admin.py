@@ -25,12 +25,10 @@ class TokenAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "token_type",
-        "is_revoked",
-        "attempts",
         "expires_at",
         "created_at",
     )
-    list_filter = ("token_type", "is_revoked")
+    list_filter = ("token_type",)
     search_fields = ("user__email",)
     ordering = ("-created_at",)
 

@@ -1,8 +1,9 @@
 """Unified Token model for the Auth microservice.
 
 Supports refresh tokens, email verification, password reset, and MFA
-challenges. Implements rotation, reuse detection (via ``session_family``),
-and brute-force protection (via ``attempts``).
+challenges. The model is intentionally lean — brute-force protection is
+delegated to the FastAPI Gateway (rate limiting), and token rotation uses
+simple deletion rather than revocation tracking.
 """
 
 from __future__ import annotations
@@ -38,9 +39,6 @@ class Token(models.Model):
         token_hash: SHA-256 hash of the raw opaque string (unique, indexed).
         expires_at: When the token becomes invalid.
         created_at: Auto-set on creation.
-        session_family: Groups rotated refresh tokens for reuse detection.
-        is_revoked: Whether this token has been explicitly revoked.
-        attempts: Failed verification attempts (brute-force protection).
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -55,13 +53,6 @@ class Token(models.Model):
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
-
-    # Rotation & reuse detection
-    session_family = models.UUIDField(default=uuid.uuid4, db_index=True)
-    is_revoked = models.BooleanField(default=False)
-
-    # Brute-force protection for MFA/Verify codes
-    attempts = models.IntegerField(default=0)
 
     class Meta:
         ordering = ["-created_at"]
@@ -89,12 +80,9 @@ class Token(models.Model):
 
     @property
     def is_valid(self) -> bool:
-        """Whether this token is still usable.
+        """Whether this token is still usable (i.e. not expired).
 
         Returns:
-            ``False`` if revoked, exhausted (>= 5 attempts), or expired;
-            otherwise ``True``.
+            ``True`` if the current time is before ``expires_at``.
         """
-        if self.is_revoked or self.attempts >= 5:
-            return False
         return timezone.now() < self.expires_at
