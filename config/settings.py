@@ -38,11 +38,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.admin",
-    "auth",
+    "identity",
 ]
 
 MIDDLEWARE = [
-    "auth.api.middleware.RequestIDMiddleware",
+    "identity.api.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -80,7 +80,7 @@ DATABASES = {"default": env.db("DATABASE_URL")}
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
-AUTH_USER_MODEL = "auth_service.User"
+AUTH_USER_MODEL = "identity.User"
 
 # Stateless API fronted by a gateway; sessions/CSRF are not used for auth.
 # CSRF protection remains configured for the admin only.
@@ -166,7 +166,7 @@ LOGGING = {
     },
     "loggers": {
         "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
-        "auth": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "identity": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }

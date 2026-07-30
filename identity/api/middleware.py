@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from django.http import HttpRequest, HttpResponse
 
-logger = logging.getLogger("auth.middleware")
+logger = logging.getLogger("identity.middleware")
 
 
 class RequestIDMiddleware:
