@@ -7,7 +7,7 @@ Mounts the Django Ninja API under ``/api`` and the Django admin under
 from django.contrib import admin
 from django.urls import path
 
-from auth.api.routers import api
+from identity.api.routers import api
 
 urlpatterns = [
     path("admin/", admin.site.urls),
