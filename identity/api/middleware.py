@@ -40,7 +40,7 @@ class RequestIDMiddleware:
             The outgoing ``HttpResponse`` with ``X-Request-ID`` set.
         """
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        request.request_id = request_id
+        setattr(request, "request_id", request_id)  # noqa: B010
         logger.info(
             "Incoming request: %s %s",
             request.method,
