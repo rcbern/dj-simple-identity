@@ -1,6 +1,6 @@
 # Domain: Multi-Factor Authentication (MFA)
 
-> **Section 9** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 6** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Model Definition: `UserMFA` (`identity/models/mfa.py`)
 Strictly handles TOTP. Secrets are encrypted at rest using Fernet.
@@ -135,8 +135,6 @@ class UserMFAService:
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Identity & Users](identity-and-users.md)
 - [Token Management & Security](token-management.md)
 - [Authentication & Sessions](authentication-and-sessions.md)

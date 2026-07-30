@@ -1,6 +1,6 @@
 # Domain: Authentication & Sessions
 
-> **Section 7** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 4** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
 The `AuthService` handles active sessions and stateless Access Token generation (RS256). It implements simple refresh token rotation (delete old, issue new — no session families or reuse detection).
@@ -109,11 +109,8 @@ class AuthService:
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Identity & Users](identity-and-users.md)
 - [Token Management & Security](token-management.md)
 - [Multi-Factor Authentication (MFA)](mfa.md)
 - [Single Sign-On (SSO)](sso.md)
 - [REST API (Django Ninja)](../api/rest-api.md)
-- [Logging and Observability](../observability.md)

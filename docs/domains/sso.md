@@ -1,6 +1,6 @@
 # Domain: Single Sign-On (SSO)
 
-> **Section 10** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 7** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
 Uses the Dependency Inversion Principle. SSO integrations rely on Abstract Base Classes. If a user logs in with GitHub, but already has a local email/password account that is *unverified*, the service refuses to merge them, preventing account takeover.
@@ -131,8 +131,6 @@ class SSOService:
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Identity & Users](identity-and-users.md)
 - [Token Management & Security](token-management.md)
 - [Authentication & Sessions](authentication-and-sessions.md)

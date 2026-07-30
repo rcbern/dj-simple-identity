@@ -1,6 +1,6 @@
 # Layer: REST API (Django Ninja)
 
-> **Section 11** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 8** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
 The API layer is intentionally thin. It does not handle rate limiting (delegated to FastAPI Gateway). Refresh tokens are returned in the JSON response body (not HttpOnly cookies) — the gateway or client is responsible for secure storage.
@@ -124,9 +124,6 @@ api.add_router("/sso", sso_router)
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Authentication & Sessions](../domains/authentication-and-sessions.md)
 - [Multi-Factor Authentication (MFA)](../domains/mfa.md)
 - [Token Management & Security](../domains/token-management.md)
-- [Logging and Observability](../observability.md)

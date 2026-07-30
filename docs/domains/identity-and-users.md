@@ -1,6 +1,6 @@
 # Domain: Identity & Users
 
-> **Section 5** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 2** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
 The `User` model strips away default Django fields (`first_name`, `username`) and drops `PermissionsMixin` (removing unused `groups` and `permissions` tables). Identity is strictly tied to `email`.
@@ -74,8 +74,6 @@ class User(AbstractBaseUser):
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Token Management & Security](token-management.md)
 - [Authentication & Sessions](authentication-and-sessions.md)
 - [Account Lifecycle & Events](account-lifecycle.md)

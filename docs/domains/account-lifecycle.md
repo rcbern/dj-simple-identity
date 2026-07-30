@@ -1,6 +1,6 @@
 # Domain: Account Lifecycle & Event-Driven Architecture
 
-> **Section 8** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 5** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Infrastructure: `EventPublisher` (`identity/infrastructure/event_publisher.py`)
 Pushes JSON messages to a Redis Stream. Uses proper logging instead of `print()`. Catches both `RedisError` and serialization errors (`TypeError`, `ValueError`) to ensure fire-and-forget semantics.
@@ -144,9 +144,5 @@ class AccountService:
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Identity & Users](identity-and-users.md)
 - [Token Management & Security](token-management.md)
-- [Logging and Observability](../observability.md)
-- [Testing Strategy](../testing.md)

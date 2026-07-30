@@ -1,6 +1,6 @@
 # Domain: Token Management & Security
 
-> **Section 6** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
+> **Section 3** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### The Hybrid JWT Strategy & Simple Rotation
 1. **Generation:** A 48-character cryptographically secure opaque string is generated.
@@ -130,8 +130,6 @@ class TokenService:
 
 ## Related documents
 - [Overview](../overview.md)
-- [Architectural Decisions Summary](../architectural-decisions.md)
-- [Directory Structure](../directory-structure.md)
 - [Identity & Users](identity-and-users.md)
 - [Authentication & Sessions](authentication-and-sessions.md)
 - [Account Lifecycle & Events](account-lifecycle.md)
