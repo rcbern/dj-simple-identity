@@ -169,4 +169,5 @@ class AuthService:
         return {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,
+            "user_id": str(user.id),
         }
