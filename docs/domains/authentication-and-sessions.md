@@ -3,77 +3,108 @@
 > **Section 7** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
-The `AuthService` handles active sessions and stateless Access Token generation (RS256). It implements Refresh Token Rotation and sets HttpOnly cookies.
+The `AuthService` handles active sessions and stateless Access Token generation (RS256). It implements simple refresh token rotation (delete old, issue new — no session families or reuse detection).
 
-### Service Definition: `AuthService` (`auth/services/auth_service.py`)
+### Service Definition: `AuthService` (`identity/services/auth_service.py`)
 ```python
-import jwt
+# identity/services/auth_service.py
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
+import jwt
 from django.conf import settings
 from django.contrib.auth import authenticate
-from .token_service import TokenService
-from .mfa_service import UserMFAService
 
-logger = logging.getLogger('auth.services.auth_service')
+from identity.exceptions import (
+    EmailNotVerifiedError,
+    InvalidCredentialsError,
+    TokenInvalidError,
+)
+from identity.models.token import Token, TokenType
+from identity.models.user import User
+from identity.services.mfa_service import UserMFAService
+from identity.services.token_service import TokenService
+
+logger = logging.getLogger("identity.services.auth_service")
+
+ACCESS_TOKEN_EXPIRY_MINUTES = 15
+REFRESH_TOKEN_EXPIRY_DAYS = 7
+
 
 class AuthService:
     @staticmethod
-    def generate_access_token(user):  # Public, used by SSO service
+    def generate_access_token(user: User) -> str:
         payload = {
-            'user_id': str(user.id), 'email': user.email,
-            'pwd_changed_at': user.password_changed_at.isoformat(),
-            'exp': datetime.now(timezone.utc) + timedelta(minutes=15),
-            'iat': datetime.now(timezone.utc),
+            "user_id": str(user.id),
+            "email": user.email,
+            "pwd_changed_at": user.password_changed_at.isoformat(),
+            "exp": datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRY_MINUTES),
+            "iat": datetime.now(UTC),
         }
-        return jwt.encode(payload, settings.JWT_PRIVATE_KEY, algorithm='RS256')
+        return jwt.encode(payload, settings.JWT_PRIVATE_KEY, algorithm="RS256")
 
     @staticmethod
-    def login(email, password, request_id=None):
-        extra = {'request_id': request_id} if request_id else {}
+    def login(email: str, password: str, request_id: str | None = None) -> dict[str, object]:
+        extra: dict[str, str] = {"request_id": request_id} if request_id else {}
+
         user = authenticate(username=email, password=password)
         if user is None:
-            logger.warning(f"Failed login attempt for email: {email}", extra=extra)
-            raise ValueError("Invalid email or password.")
+            logger.warning("Failed login attempt for email: %s", email, extra=extra)
+            raise InvalidCredentialsError("Invalid email or password.")
+
         if not user.is_verified:
-            raise PermissionError("Email not verified.")
+            raise EmailNotVerifiedError("Email not verified.")
 
         mfa_challenge = UserMFAService.issue_challenge(user)
         if mfa_challenge:
-            return {'mfa_required': True, 'mfa_token': mfa_challenge, 'user_id': str(user.id)}
+            return {
+                "mfa_required": True,
+                "mfa_token": mfa_challenge,
+                "user_id": str(user.id),
+            }
 
         access_token = AuthService.generate_access_token(user)
-        refresh_token = TokenService.issue_token(user, TokenType.REFRESH, timedelta(days=7))
-        return {'access_token': access_token, 'refresh_token': refresh_token, 'user_id': str(user.id)}
+        refresh_token = TokenService.issue_token(
+            user, TokenType.REFRESH, timedelta(days=REFRESH_TOKEN_EXPIRY_DAYS)
+        )
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user_id": str(user.id),
+        }
 
     @staticmethod
-    def logout(user, refresh_token=None, request_id=None):
+    def logout(user: User, refresh_token: str | None = None, request_id: str | None = None) -> None:
         # Idempotent: doesn't throw if token is already gone
         if refresh_token:
             token = TokenService.decode_and_validate_token(refresh_token, TokenType.REFRESH)
-            if token: token.delete()
+            if token:
+                token.delete()
         else:
             Token.objects.filter(user=user, token_type=TokenType.REFRESH).delete()
 
     @staticmethod
-    def refresh(raw_refresh_token, request_id=None):
+    def refresh(raw_refresh_token: str, request_id: str | None = None) -> dict[str, str]:
         token = TokenService.decode_and_validate_token(raw_refresh_token, TokenType.REFRESH)
         if not token:
-            raise PermissionError("Invalid or expired refresh token.")
+            raise TokenInvalidError("Invalid or expired refresh token.")
 
         user = token.user
 
-        # Rotation: Revoke old, issue new in same family
-        token.is_revoked = True
-        token.save(update_fields=['is_revoked'])
-        
+        # Simple rotation: delete the old token, issue a new one
+        token.delete()
+
         new_refresh_token = TokenService.issue_token(
-            user=user, token_type=TokenType.REFRESH,
-            expiry_delta=timedelta(days=7),
-            session_family=token.session_family
+            user=user,
+            token_type=TokenType.REFRESH,
+            expiry_delta=timedelta(days=REFRESH_TOKEN_EXPIRY_DAYS),
         )
         new_access_token = AuthService.generate_access_token(user)
-        return {'access_token': new_access_token, 'refresh_token': new_refresh_token}
+        return {
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token,
+            "user_id": str(user.id),
+        }
 ```
 
 ## Related documents

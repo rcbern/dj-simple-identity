@@ -10,69 +10,89 @@ Every incoming HTTP request is assigned a unique `X-Request-ID`. To ensure that 
 
 ### Implementation
 
-#### Settings Configuration (`settings.py`)
+#### Settings Configuration (`config/settings.py`)
 ```python
-import os
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+# config/settings.py (logging excerpt)
+LOG_LEVEL = env("LOG_LEVEL")
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-            'format': '%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s",
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler', 'formatter': 'json', 'stream': 'ext://sys.stdout',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
         },
     },
-    'loggers': {
-        'django': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
-        'auth': {'handlers': ['console'], 'level': LOG_LEVEL, 'propagate': False},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "identity": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
-    'root': {'handlers': ['console'], 'level': LOG_LEVEL},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
 ```
 
-#### Request ID Middleware (`auth/api/middleware.py`)
+#### Request ID Middleware (`identity/api/middleware.py`)
 ```python
-import uuid
+# identity/api/middleware.py
 import logging
-logger = logging.getLogger('auth.middleware')
+import uuid
+from collections.abc import Callable
+
+from django.http import HttpRequest, HttpResponse
+
+logger = logging.getLogger("identity.middleware")
+
 
 class RequestIDMiddleware:
-    def __init__(self, get_response):
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
-    def __call__(self, request):
-        request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
-        request.request_id = request_id
-        logger.info(f"Incoming request: {request.method} {request.path}", extra={'request_id': request_id})
-        
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        setattr(request, "request_id", request_id)
+        logger.info(
+            "Incoming request: %s %s",
+            request.method,
+            request.path,
+            extra={"request_id": request_id},
+        )
+
         response = self.get_response(request)
-        response['X-Request-ID'] = request_id
+        response["X-Request-ID"] = request_id
         return response
 ```
 
-#### Usage in Services (`auth/services/auth_service.py`)
+#### Usage in Services (`identity/services/auth_service.py`)
 ```python
+# identity/services/auth_service.py (excerpt)
 import logging
-logger = logging.getLogger('auth.services.auth_service')
+
+logger = logging.getLogger("identity.services.auth_service")
+
 
 class AuthService:
     @staticmethod
     def login(email, password, request_id=None):
-        extra = {'request_id': request_id} if request_id else {}
-        
+        extra = {"request_id": request_id} if request_id else {}
+
         user = authenticate(username=email, password=password)
         if user is None:
-            logger.warning(f"Failed login attempt for email: {email}", extra=extra)
-            raise ValueError("Invalid email or password.")
-            
-        logger.info(f"User logged in successfully: {user.id}", extra={**extra, 'user_id': str(user.id)})
+            logger.warning("Failed login attempt for email: %s", email, extra=extra)
+            raise InvalidCredentialsError("Invalid email or password.")
+
+        logger.info(
+            "User logged in successfully: %s",
+            user.id,
+            extra={**extra, "user_id": str(user.id)},
+        )
 ```
 
 ## Related documents

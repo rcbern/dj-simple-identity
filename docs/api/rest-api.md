@@ -3,96 +3,123 @@
 > **Section 11** of the Auth Microservice Architecture Specification. See [`README.md`](../README.md) for the full index.
 
 ### Architecture
-The API layer is intentionally thin. It does not handle rate limiting (delegated to FastAPI Gateway). It manages HttpOnly cookies for refresh tokens.
+The API layer is intentionally thin. It does not handle rate limiting (delegated to FastAPI Gateway). Refresh tokens are returned in the JSON response body (not HttpOnly cookies) — the gateway or client is responsible for secure storage.
 
-### JWT Auth Dependency (`auth/api/auth.py`)
-Validates the Access Token passed by the Gateway to protect internal Auth routes (like `/mfa/enroll`).
+### JWT Auth Dependency (`identity/api/auth.py`)
+Validates the RS256 Access Token passed by the Gateway to protect internal Auth routes (like `/mfa/enroll`). Returns `None` on failure (Django Ninja converts this to a 401 response).
 
 ```python
+# identity/api/auth.py
+import logging
+from datetime import UTC, datetime
+
 import jwt
-from ninja.security import HttpBearer
-from ninja.errors import HttpError
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from datetime import datetime
+from ninja.security import HttpBearer
 
-User = get_user_model()
+logger = logging.getLogger("identity.api.auth")
+UserModel = get_user_model()
+
 
 class JWTAuth(HttpBearer):
-    def authenticate(self, request, token):
-        try: payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=['RS256'])
-        except jwt.PyJWTError: raise HttpError(401, "Invalid access token.")
+    def authenticate(self, request, token: str):
+        try:
+            payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=["RS256"])
+        except jwt.PyJWTError:
+            logger.warning("Invalid JWT received")
+            return None
 
-        try: user = User.objects.get(id=payload['user_id'])
-        except User.DoesNotExist: raise HttpError(401, "User not found.")
+        exp = payload.get("exp")
+        if exp and datetime.now(UTC).timestamp() > exp:
+            logger.warning("Expired JWT received")
+            return None
 
-        token_pwd_time = datetime.fromisoformat(payload['pwd_changed_at']).replace(tzinfo=timezone.utc)
-        if user.password_changed_at > token_pwd_time:
-            raise HttpError(401, "Token invalidated due to password change.")
-            
-        request.user = user
-        return user
+        user_id = payload.get("user_id")
+        if not user_id:
+            return None
+
+        try:
+            return UserModel.objects.get(id=user_id)
+        except UserModel.DoesNotExist:
+            logger.warning("JWT user not found: %s", user_id)
+            return None
 ```
 
-### Router Example: Auth Routes (`auth/api/routers/auth_routes.py`)
+### Schemas (`identity/api/schemas/`)
+Pydantic models for request/response payloads, split into `common.py` (Error, Message, TokenPair, MFAChallenge) and `requests.py` (per-domain request bodies).
+
+### Routers (`identity/api/routers/`)
+All routers are mounted under a single `NinjaAPI` instance served at `/api/`.
+
+#### Auth Router (`identity/api/routers/auth.py`)
+* `POST /auth/login` — Authenticate, return tokens or MFA challenge
+* `POST /auth/mfa/verify` — Verify MFA challenge and issue tokens
+* `POST /auth/refresh` — Rotate refresh token
+* `POST /auth/logout` — Revoke refresh token (requires JWT auth)
+
 ```python
-from ninja import Router
-from ninja.errors import HttpError
-from ..schemas.auth import LoginIn, TokenOut, RefreshOut
-from ...services.auth_service import AuthService
-
-router = Router()
-
-@router.post("/login", response={200: TokenOut})
-def login(request, payload: LoginIn):
+# identity/api/routers/auth.py (excerpt)
+@router.post("/login", response={200: TokenPair | MFAChallenge, 401: Error})
+def login(request, payload: LoginRequest):
     try:
-        result = AuthService.login(payload.email, payload.password, request.request_id)
-        response = router.create_response(request, result, status=200)
-        
-        if 'refresh_token' in result:
-            response.set_cookie(
-                key='refresh_token', value=result['refresh_token'],
-                httponly=True, secure=True, samesite='Strict', max_age=7*24*60*60
-            )
-        return response
-    except (ValueError, PermissionError) as e:
-        raise HttpError(400, str(e))
-
-@router.post("/refresh", response=RefreshOut)
-def refresh_token(request):
-    refresh_token = request.COOKIES.get('refresh_token')
-    if not refresh_token: raise HttpError(401, "No refresh token provided.")
-        
-    try:
-        result = AuthService.refresh(refresh_token, request.request_id)
-        response = router.create_response(request, result, status=200)
-        response.set_cookie(
-            key='refresh_token', value=result['refresh_token'],
-            httponly=True, secure=True, samesite='Strict', max_age=7*24*60*60
+        result = AuthService.login(
+            email=payload.email,
+            password=payload.password,
+            request_id=getattr(request, "request_id", None),
         )
-        return response
-    except PermissionError as e:
-        response.delete_cookie('refresh_token')
-        raise HttpError(401, str(e))
+        if result.get("mfa_required"):
+            return 200, MFAChallenge(
+                mfa_required=True,
+                mfa_token=result["mfa_token"],
+                user_id=result["user_id"],
+            )
+        return 200, TokenPair(
+            access_token=result["access_token"],
+            refresh_token=result["refresh_token"],
+            user_id=result["user_id"],
+        )
+    except AuthError as exc:
+        return 401, Error(detail=str(exc))
 
-@router.post("/logout")
-def logout(request):
-    refresh_token = request.COOKIES.get('refresh_token')
-    AuthService.logout(request.user, refresh_token, request.request_id)
-    response = router.create_response(request, {"success": True}, status=200)
-    response.delete_cookie('refresh_token')
-    return response
+
+@router.post("/logout", response={200: Message, 401: Error}, auth=JWTAuth())
+def logout(request, payload: LogoutRequest):
+    user = request.auth
+    AuthService.logout(user=user, refresh_token=payload.refresh_token)
+    return 200, Message(message="Logged out successfully.")
 ```
 
-### Router Example: Health Routes (`auth/api/routers/health_routes.py`)
-```python
-from ninja import Router
-router = Router()
+#### Account Router (`identity/api/routers/account.py`)
+* `POST /account/register` — Register a new user (public)
+* `POST /account/verify-email` — Verify email with token (public)
+* `POST /account/password-reset/request` — Request reset token (public, always 200)
+* `POST /account/password-reset/confirm` — Reset password with token (public)
+* `POST /account/change-password` — Change password (requires JWT auth)
 
-@router.get("/healthz")
-def healthz(request):
-    return {"status": "ok"}
+#### MFA Router (`identity/api/routers/mfa.py`)
+* `POST /mfa/enroll` — Generate TOTP secret (requires JWT auth)
+* `POST /mfa/verify` — Verify OTP and enable MFA (requires JWT auth)
+
+#### SSO Router (`identity/api/routers/sso.py`)
+* `POST /sso/{provider}/callback` — Handle OAuth callback (public)
+
+### NinjaAPI Instance (`identity/api/routers/__init__.py`)
+```python
+# identity/api/routers/__init__.py
+from ninja import NinjaAPI
+
+from identity.api.routers.account import router as account_router
+from identity.api.routers.auth import router as auth_router
+from identity.api.routers.mfa import router as mfa_router
+from identity.api.routers.sso import router as sso_router
+
+api = NinjaAPI(title="Auth Service API", version="0.1.0")
+
+api.add_router("/auth", auth_router)
+api.add_router("/account", account_router)
+api.add_router("/mfa", mfa_router)
+api.add_router("/sso", sso_router)
 ```
 
 ## Related documents
