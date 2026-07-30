@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# Read JSON payload sent by Cline via stdin
+input=$(cat)
+
+# Extract tool name and command using jq
+tool=$(echo "$input" | jq -r '.tool // empty')
+command=$(echo "$input" | jq -r '.parameters.command // empty')
+
+# Only evaluate execution if Cline is calling the execute_command tool
+if [[ "$tool" == "execute_command" ]]; then
+
+  # 1. Block direct commits or pushes to main
+  if [[ "$command" =~ git\ (commit|push).*main ]]; then
+    echo '{"cancel": true, "errorMessage": "BLOCKED BY RULE: Direct commits or pushes to main are strictly prohibited."}'
+    exit 0
+  fi
+
+  # 2. Block direct merging of feature branches into main (Only release/* allowed)
+  if [[ "$command" =~ git\ merge ]] && [[ "$command" =~ main ]]; then
+    if ! [[ "$command" =~ release/ ]]; then
+      echo '{"cancel": true, "errorMessage": "BLOCKED BY RULE: Only release branches (release/*) are allowed to merge into main."}'
+      exit 0
+    fi
+  fi
+
+  # 3. Block tag creation unless explicitly tagged with valid SemVer (X.Y.Z or vX.Y.Z)
+  if [[ "$command" =~ git\ tag ]]; then
+    if ! [[ "$command" =~ git\ tag\ -a\ v?[0-9]+\.[0-9]+\.[0-9]+ ]] && ! [[ "$command" =~ git\ tag\ v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+      echo '{"cancel": true, "errorMessage": "BLOCKED BY RULE: Tags must strictly follow the X.Y.Z or vX.Y.Z semantic format (e.g., v1.0.0)."}'
+      exit 0
+    fi
+  fi
+
+fi
+
+# Allow execution if no rules are violated
+echo '{"cancel": false}'
