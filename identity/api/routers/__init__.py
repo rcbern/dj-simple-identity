@@ -1,13 +1,21 @@
-"""Django Ninja API instance and router registration.
+"""NinjaAPI instance and router registration.
 
-All routers are registered here and the single ``api`` instance is mounted
-in ``config/urls.py`` under ``/api``.
+All routers are mounted under a single ``NinjaAPI`` instance, which is
+imported by ``config/urls.py`` and served at ``/api/``.
 """
 
 from __future__ import annotations
 
 from ninja import NinjaAPI
 
-api = NinjaAPI(title="Auth Service API", version="0.1.0")
+from identity.api.routers.account import router as account_router
+from identity.api.routers.auth import router as auth_router
+from identity.api.routers.mfa import router as mfa_router
+from identity.api.routers.sso import router as sso_router
 
-# Routers will be registered here as they are implemented in Phase 6.
+api = NinjaAPI(title="Auth Service API", version="0.0.1")
+
+api.add_router("/auth", auth_router)
+api.add_router("/account", account_router)
+api.add_router("/mfa", mfa_router)
+api.add_router("/sso", sso_router)
