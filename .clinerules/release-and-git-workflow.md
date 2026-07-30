@@ -10,7 +10,13 @@
 * A feature merge only updates the staging/release branch.
 * Merging a release branch into `main` is a separate, dedicated step that **requires explicit operator instruction and review**.
 
----
+### Release Branch Freeze Policy
+
+* **Once a release branch has been tagged or superseded by a newer release branch, it is frozen.** No further commits may be merged into a frozen release branch.
+* **Creating a new release branch:** When a new release branch (e.g., `release/v0.1.0`) is created, the previous release branch (e.g., `release/v0.0.1`) must be frozen immediately. Any in-flight feature branches that were targeting the old release must be retargeted to the new one.
+* **Port-forward:** When creating a new release branch from an existing one, all commits from the old branch (up to the freeze point) are carried forward. The old branch is reset to its last valid state before the version bump.
+* **No commits to frozen branches:** An agent must never commit, merge, or push to a frozen release branch. If a fix is needed for an older release, a hotfix branch (`fix/*`) should be created from the frozen release tag, not from the frozen branch itself.
+
 
 ## 2. Commit & Push Granularity Workflow
 
