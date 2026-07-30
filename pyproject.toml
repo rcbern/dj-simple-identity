@@ -7,6 +7,7 @@ dependencies = [
     "django>=6.0.7",
     "django-environ>=0.14.0",
     "django-ninja>=1.6.2",
+    "httpx>=0.28.0",
     "psycopg[binary]>=3.3.4",
     "pyjwt>=2.13.0",
     "pyotp>=2.10.0",
@@ -23,3 +24,19 @@ dev = [
     "pytest-mock>=3.15.1",
     "ruff>=0.16.0",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["auth", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
