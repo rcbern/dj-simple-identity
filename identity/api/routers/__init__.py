@@ -13,7 +13,7 @@ from identity.api.routers.auth import router as auth_router
 from identity.api.routers.mfa import router as mfa_router
 from identity.api.routers.sso import router as sso_router
 
-api = NinjaAPI(title="Auth Service API", version="0.0.1")
+api = NinjaAPI(title="Auth Service API", version="0.1.0")
 
 api.add_router("/auth", auth_router)
 api.add_router("/account", account_router)
