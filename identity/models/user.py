@@ -118,6 +118,14 @@ class User(AbstractBaseUser):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS: list[str] = []
 
+    def has_module_perms(self, app_label: str) -> bool:
+        """Required by django admin, Returns True only if is_superuser"""
+        return bool(self.is_superuser)
+
+    def has_perm(self, perm: str, obj=None) -> bool:
+        """Required by django admin, Returns True only if is_superuser"""
+        return bool(self.is_superuser)
+
     def change_password(self, new_password: str) -> None:
         """Set a new password and record the change timestamp.
 
