@@ -1,12 +1,14 @@
 """Django admin registrations for the Identity app."""
 
 from django.contrib import admin
+from django.contrib.auth.models import Group
 
 from identity.models.mfa import UserMFA
 from identity.models.sso import SocialAccount
 from identity.models.token import Token
 from identity.models.user import User
 
+admin.site.unregister(Group) # Unregisted Django Group, unused.
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
